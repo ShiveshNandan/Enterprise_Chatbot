@@ -2,8 +2,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = "http://127.0.0.1:8000";
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const DEFAULT_API_KEY = process.env.NEXT_PUBLIC_DEFAULT_GOOGLE_API_KEY || "default";
 
 type ChatMode = "pdf" | "general";
@@ -74,9 +74,15 @@ export default function Home() {
 
   useEffect(() => {
     const loadHistory = async () => {
+      let res: Response | null = null;
       try {
-        const res = await fetch(`${API_BASE_URL}/history`);
-        if (!res.ok) return;
+        if(mode === 'general'){
+          res = await fetch(`${API_BASE_URL}/history_gen`);
+        }
+        else{
+          res = await fetch(`${API_BASE_URL}/history`);
+        }
+        if (!res?.ok) return;
         const data = await res.json();
         const history: HistoryItem[] = data.history || [];
         const converted: ChatMessage[] = [];
@@ -105,7 +111,7 @@ export default function Home() {
       }
     };
     loadHistory();
-  }, []);
+  }, [mode]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setStatusMessage(null);
@@ -250,9 +256,76 @@ export default function Home() {
     }
   };
 
+  const sendGenQuestion = async (questionText: string) => {
+    const trimmed = questionText.trim();
+    if (!trimmed || isAsking) return;
+
+    setStatusMessage(null);
+
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: trimmed,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+
+    const effectiveApiKey = useCustomConfig ? apiKey.trim() : DEFAULT_API_KEY;
+    if (!effectiveApiKey) {
+      setPanelOpen(true);
+      appendAssistantError(
+        "Custom Google AI API Key is missing. Please enter your API key in the Custom setup section and try again."
+      );
+      return;
+    }
+
+    setIsAsking(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/gen_ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: trimmed,
+          api_key: effectiveApiKey,
+          model_name: "Google AI",
+          mode,
+          k: 4,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to get answer from backend.");
+      }
+
+      const botMsg: ChatMessage = {
+        id: `bot-${Date.now()}`,
+        role: "assistant",
+        content: data.answer,
+        timestamp: data.timestamp,
+        pdfNames: data.pdf_names,
+      };
+      setMessages((prev) => [...prev, botMsg]);
+    } catch (err) {
+      appendAssistantError(
+        err instanceof Error ? err.message : "Unexpected error while requesting answer."
+      );
+    } finally {
+      setIsAsking(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    sendQuestion(input);
+    console.log(mode);
+    if(mode !== 'general'){
+      console.log("hello")
+      sendQuestion(input);
+    }else {
+      console.log("hello2")
+      sendGenQuestion(input);
+    }
   };
 
   const handleReset = async () => {
@@ -277,7 +350,11 @@ export default function Home() {
   };
 
   const handleDownloadCsv = () => {
-    window.open(`${API_BASE_URL}/history/csv`, "_blank");
+    if(mode === 'general'){
+      window.open(`${API_BASE_URL}/history_gen/csv`, "_blank");
+    }else{
+      window.open(`${API_BASE_URL}/history/csv`, "_blank");
+    }
   };
 
   return (
@@ -516,7 +593,8 @@ export default function Home() {
                           : "text-[#e3e3e3]"
                       }`}
                     >
-                      {msg.isError ? "Tokens exhausted, please try after sometime" : msg.content}
+                      {msg.content}
+                      {/* {msg.isError ? "Tokens exhausted, please try after sometime" : msg.content} */}
                     </div>
                     {(msg.timestamp || (msg.pdfNames && msg.pdfNames.length > 0)) && (
                       <div className="text-[11px] text-[#8e918f]">
@@ -560,7 +638,11 @@ export default function Home() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                sendQuestion(input);
+                if(mode === "general"){
+                  sendGenQuestion(input)
+                }else{
+                  sendQuestion(input)
+                }
               }
             }}
             placeholder={
