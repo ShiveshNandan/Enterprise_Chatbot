@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // const API_BASE_URL = "http://127.0.0.1:8000";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -593,7 +595,65 @@ export default function Home() {
                           : "text-[#e3e3e3]"
                       }`}
                     >
-                      {msg.content}
+                      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => (
+            <h1 className="mt-3 mb-2 text-xl font-bold">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="mt-3 mb-1.5 text-lg font-semibold">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="mt-2.5 mb-1 text-base font-semibold">{children}</h3>
+          ),
+          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          ul: ({ children }) => (
+            <ul className="mb-2 list-disc space-y-1 pl-5">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="mb-2 list-decimal space-y-1 pl-5">{children}</ol>
+          ),
+          li: ({ children }) => <li>{children}</li>,
+          code: ({ className, children, ...props }) => {
+            const isBlock = Boolean(className);
+            return isBlock ? (
+              <code
+                className={`block overflow-x-auto rounded-md bg-gray-900 p-3 text-xs text-gray-100 ${className ?? ""}`}
+                {...props}
+              >
+                {children}
+              </code>
+            ) : (
+              <code
+                className="rounded bg-gray-200 px-1.5 py-0.5 font-mono text-xs text-gray-900"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          },
+          pre: ({ children }) => <pre className="my-2">{children}</pre>,
+          table: ({ children }) => (
+            <div className="my-2 overflow-x-auto">
+              <table className="min-w-full border-collapse border border-gray-300 text-xs">
+                {children}
+              </table>
+            </div>
+          ),
+          th: ({ children }) => (
+            <th className="border border-gray-300 bg-gray-100 px-2.5 py-1.5 text-left font-semibold">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border border-gray-300 px-2.5 py-1.5">{children}</td>
+          ),
+        }}
+      >
+        {msg.content}
+      </ReactMarkdown>
+                      
                       {/* {msg.isError ? "Tokens exhausted, please try after sometime" : msg.content} */}
                     </div>
                     {(msg.timestamp || (msg.pdfNames && msg.pdfNames.length > 0)) && (
